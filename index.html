@@ -1,18 +1,143 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,height=device-height,initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
-   	<link href="./src/icon.png" rel="shortcut icon"/>
-	<title>io</title>
-	<script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车辆油耗数据分析</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
+        #main { width: 100%; height: 600px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    </style>
 </head>
 <body>
-	<a href="#">index</a>
-	<script>
-		window.onload = () => {
-			console.log(Echart)
-		}
-	</script>
+    <h2>🚗 车辆油耗与续航监控</h2>
+    <div id="main"></div>
+
+    <script>
+        window.onload = () => {
+            // 1. 模拟你的原始数据源
+            const rawData = [
+                { date: '2026-06-01', move: 15000, fuel: 45 },
+                { date: '2026-06-10', move: 15450, fuel: 42 },
+                { date: '2026-06-20', move: 15880, fuel: 40 },
+                { date: '2026-06-28', move: 16350, fuel: 46 },
+                { date: '2026-07-05', move: 16780, fuel: 41 }
+            ];
+
+            // 2. 数据计算与清洗
+            const dates = [];
+            const avgConsumptions = []; // 百公里油耗
+            const fuelAdded = [];       // 加油量
+            const ranges = [];          // 续航里程
+
+            const TANK_CAPACITY = 50; // 假设油箱总容量为 50L，用于计算续航
+
+            for (let i = 0; i < rawData.length; i++) {
+                const item = rawData[i];
+                dates.push(item.date);
+                fuelAdded.push(item.fuel);
+
+                if (i === 0) {
+                    // 第一条数据无法计算油耗，因为没有上一次记录
+                    avgConsumptions.push(null); 
+                    ranges.push(null);
+                } else {
+                    const prevMove = rawData[i - 1].move;
+                    const distance = item.move - prevMove;
+                    
+                    if (distance > 0) {
+                        // 计算百公里油耗: (加油量 / 行驶里程) * 100
+                        const consumption = (item.fuel / distance) * 100;
+                        avgConsumptions.push(parseFloat(consumption.toFixed(2)));
+                        
+                        // 计算续航里程: 假设每次加满，续航 = (油箱容量 / 百公里油耗) * 100
+                        const range = (TANK_CAPACITY / consumption) * 100;
+                        ranges.push(parseInt(range));
+                    } else {
+                        avgConsumptions.push(null);
+                        ranges.push(null);
+                    }
+                }
+            }
+
+            // 3. 初始化 ECharts
+            const myChart = echarts.init(document.getElementById('main'));
+
+            // 4. 配置项
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' },
+                    formatter: function(params) {
+                        let res = `<strong>${params[0].axisValue}</strong><br/>`;
+                        params.forEach(p => {
+                            if (p.value !== null && p.value !== undefined) {
+                                let unit = '';
+                                if (p.seriesName === '百公里油耗') unit = ' L/100km';
+                                else if (p.seriesName === '续航里程') unit = ' km';
+                                else if (p.seriesName === '加油量') unit = ' L';
+                                res += `${p.marker} ${p.seriesName}: ${p.value}${unit}<br/>`;
+                            }
+                        });
+                        return res;
+                    }
+                },
+                legend: { data: ['百公里油耗', '续航里程', '加油量'] },
+                toolbox: { feature: { saveAsImage: {} } },
+                xAxis: [{
+                    type: 'category',
+                    boundaryGap: true,
+                    data: dates,
+                    axisTick: { alignWithLabel: true }
+                }],
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '油耗 (L/100km)',
+                        position: 'left',
+                        axisLine: { show: true, lineStyle: { color: '#5470C6' } }
+                    },
+                    {
+                        type: 'value',
+                        name: '里程/油量',
+                        position: 'right',
+                        axisLine: { show: true, lineStyle: { color: '#91CC75' } }
+                    }
+                ],
+                series: [
+                    {
+                        name: '百公里油耗',
+                        type: 'line',
+                        yAxisIndex: 0,
+                        data: avgConsumptions,
+                        smooth: true,
+                        itemStyle: { color: '#5470C6' },
+                        markPoint: { data: [{ type: 'max', name: '最高油耗' }, { type: 'min', name: '最低油耗' }] }
+                    },
+                    {
+                        name: '续航里程',
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: ranges,
+                        smooth: true,
+                        itemStyle: { color: '#FAC858' },
+                        lineStyle: { type: 'dashed' }
+                    },
+                    {
+                        name: '加油量',
+                        type: 'bar',
+                        yAxisIndex: 1,
+                        data: fuelAdded,
+                        itemStyle: { color: '#EE6666' },
+                        barWidth: '20%'
+                    }
+                ]
+            };
+
+            myChart.setOption(option);
+            window.addEventListener('resize', () => myChart.resize());
+        }
+    </script>
 </body>
 </html>
